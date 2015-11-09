@@ -12,6 +12,9 @@ import astropy.units as u
 import astropy.constants as const
 from astropy import cosmology
 
+from scipy.interpolate import interp1d
+from scipy.integrate   import quad
+
 from . import registry
 
 __all__ = ['get_bandpass', 'get_magsystem', 'read_bandpass', 'Bandpass',
@@ -298,7 +301,7 @@ class Spectrum(object):
     def dist(self, value):
         self._dist = value
 
-    def bandflux(self, band):
+    def bandflux(self, band, accurate=False):
         """Perform synthentic photometry in a given bandpass.
 
         The bandpass transmission is interpolated onto the wavelength grid
@@ -337,10 +340,18 @@ class Spectrum(object):
 
         # Then convert ergs to photons: photons = Energy / (h * nu).
         f = f / const.h.cgs.value / self._wunit.to(u.Hz, d, u.spectral())
-
-        trans = np.interp(d, bwave, btrans)
-        binw = np.gradient(d)
-        ftot = np.sum(f * trans * binw)
+        
+        # fast integral
+        if not accurate: 
+            trans = np.interp(d, bwave, btrans)
+            binw = np.gradient(d)
+            ftot = np.sum(f * trans * binw)
+        
+        # slow but accurate integral
+        else:
+            transfunc = interp1d(bwave, btrans, kind='cubic')
+            intfunc   = interp1d(d, f * transfunc(d), kind='cubic')
+            ftot    = quad(intfunc, d.min(), d.max())[0]
 
         if self._error is None:
             return ftot
@@ -562,8 +573,8 @@ class NaturalMagSystem(MagSystem):
         return self._standards
 
     @_verify_band(0)
-    def _refspectrum_bandflux(self, band):
-        return self.standards[band].bandflux(band)
+    def _refspectrum_bandflux(self, band, accurate=False):
+        return self.standards[band].bandflux(band, accurate=accurate)
     
     @_verify_band(1)
     def band_flux_to_mag(self, flux, band):
@@ -578,8 +589,8 @@ class NaturalMagSystem(MagSystem):
         return self.standards[band].meta['name']
 
     @_verify_band(0)
-    def standard_mag(self, band):
-        return self.band_flux_to_mag(self._refspectrum_bandflux(band), band)
+    def standard_mag(self, band, accurate=False):
+        return self.band_flux_to_mag(self._refspectrum_bandflux(band, accurate=accurate), band)
     
 
 class SpectralMagSystem(StandardMagSystem):
