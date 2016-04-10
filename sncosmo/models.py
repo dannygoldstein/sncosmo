@@ -488,6 +488,7 @@ class TimeSeriesSource(Source):
         self.version = version
         self._phase = phase
         self._wave = wave
+        self._passed_flux = flux
         self._parameters = np.array([1.])
         self._model_flux = Spline2d(phase, wave, flux, kx=2, ky=2)
         self._zero_before = zero_before
