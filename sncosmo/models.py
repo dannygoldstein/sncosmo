@@ -488,6 +488,7 @@ class TimeSeriesSource(Source):
         self.version = version
         self._phase = phase
         self._wave = wave
+        self._passed_flux = flux
         self._parameters = np.array([1.])
         self._model_flux = Spline2d(phase, wave, flux, kx=2, ky=2)
         self._zero_before = zero_before
@@ -1578,7 +1579,7 @@ class CCM89Dust(PropagationEffect):
     """Cardelli, Clayton, Mathis (1989) extinction model dust."""
     _param_names = ['ebv', 'r_v']
     param_names_latex = ['E(B-V)', 'R_V']
-    _minwave = 909.09
+    _minwave = 1000.
     _maxwave = 33333.33
 
     def __init__(self):
