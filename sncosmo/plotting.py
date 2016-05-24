@@ -315,14 +315,17 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         lines = []
         labels = []
         mflux_ranges = []
+        mfluxes = []
         for i, model in enumerate(models):
             if model.bandoverlap(band):
                 mflux = model.bandflux(band, tgrid, zp=zp, zpsys=zpsys)
                 mflux_ranges.append((mflux.min(), mflux.max()))
-                l, = ax.plot(tgrid - toff, mflux,
-                             ls=_model_ls[i % len(_model_ls)],
-                             marker='None', color=bandcolor)
-                lines.append(l)
+                if i == 0:
+                    l, = ax.plot(tgrid - toff, mflux,
+                                 ls='--', marker='None', color=bandcolor)
+                    lines.append(l)
+                else:
+                    mfluxes.append(mflux)
             else:
                 # Add a dummy line so the legend displays all models in the
                 # first panel.
@@ -330,6 +333,15 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
                                         ls=_model_ls[i % len(_model_ls)],
                                         marker='None', color=bandcolor))
             labels.append(model_labels[i])
+        lmed, = ax.plot(tgrid - toff, np.median(mfluxes, axis=0),
+                        marker='None', color=bandcolor, lw=1.2)
+        lines.append(lmed)
+        l1s = np.percentile(mfluxes, 50 + 68/2., 0)
+        l1ms = np.percentile(mfluxes, 50 - 68/2., 0)
+            
+        ax.fill_between(tgrid-toff, l1ms, l1s, alpha=0.2,
+                        color=bandcolor)
+            
 
         # Add a legend, if this is the first axes and there are two
         # or more models to distinguish between.
