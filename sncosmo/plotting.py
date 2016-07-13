@@ -20,10 +20,11 @@ _model_ls = ['-', '--', ':', '-.']
 
 
 def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
-            pulls=True, xfigsize=None, yfigsize=None, figtext=None,
+            pulls=True, xfigsize=None, yfigsize=None, figtext=None, 
             model_label=None, errors=None, ncol=2, figtextsize=1.,
             show_model_params=True, tighten_ylim=False, color=None,
-            cmap=None, cmap_lims=(3000., 10000.), fname=None, **kwargs):
+            cmap=None, cmap_lims=(3000., 10000.), fname=None,
+            ci=None, **kwargs):
     """Plot light curve data or model light curves.
 
     Parameters
@@ -91,6 +92,17 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         color at the high end of the colormap.
     fname : str, optional
         Filename to pass to savefig. If None (default), figure is returned.
+    ci : (float, float, float), optional
+        When multiple models are given, the percentiles for a light
+        curve confidence interval. The upper and lower perceniles
+        define a fill between region, and the middle percentile
+        defines a line that will be plotted over the fill between
+        region.
+
+the percentiles of the light curve confidence
+        interval to plot. The first argument sets the lower
+    
+    
     kwargs : optional
         Any additional keyword args are passed to `~matplotlib.pyplot.savefig`.
         Popular options include ``dpi``, ``format``, ``transparent``. See
@@ -316,13 +328,16 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         labels = []
         mflux_ranges = []
         mfluxes = []
+        plotci = len(models) > 1 and ci is not None
+        
         for i, model in enumerate(models):
             if model.bandoverlap(band):
                 mflux = model.bandflux(band, tgrid, zp=zp, zpsys=zpsys)
-                mflux_ranges.append((mflux.min(), mflux.max()))
-                if i == 0:
+                if not plotci:
+                    mflux_ranges.append((mflux.min(), mflux.max()))
                     l, = ax.plot(tgrid - toff, mflux,
-                                 ls='--', marker='None', color=bandcolor)
+                                 ls=_model_ls[i % len(_model_ls)],
+                                 marker='None', color=bandcolor)
                     lines.append(l)
                 else:
                     mfluxes.append(mflux)
@@ -333,15 +348,14 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
                                         ls=_model_ls[i % len(_model_ls)],
                                         marker='None', color=bandcolor))
             labels.append(model_labels[i])
-        lmed, = ax.plot(tgrid - toff, np.median(mfluxes, axis=0),
-                        marker='None', color=bandcolor, lw=1.2)
-        lines.append(lmed)
-        l1s = np.percentile(mfluxes, 50 + 68/2., 0)
-        l1ms = np.percentile(mfluxes, 50 - 68/2., 0)
-            
-        ax.fill_between(tgrid-toff, l1ms, l1s, alpha=0.2,
-                        color=bandcolor)
-            
+
+        if plotci:
+            lo, med, up = np.percentile(mfluxes, ci, axis=0)
+            l, = ax.plot(tgrid - toff, med, marker='None',
+                         color=bandcolor)
+            lines.append(l)
+            ax.fill_between(tgrid - toff, lo, up, color=bandcolor,
+                            alpha=0.4)
 
         # Add a legend, if this is the first axes and there are two
         # or more models to distinguish between.
