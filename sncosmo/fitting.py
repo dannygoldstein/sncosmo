@@ -933,7 +933,7 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
         return logp
 
     def lnprob(parameters):
-        return lnprior(parmeters) + lnlike(parameters)
+        return lnprior(parameters) + lnlike(parameters)
 
     # Heuristic determination of walker initial positions: distribute
     # walkers uniformly over parameter space. If no bounds are
