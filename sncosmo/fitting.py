@@ -927,6 +927,7 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
         return logp
 
     def lnprior(parameters):
+        logp = 0
         for i, func in idxpriors:
             logp += func(parameters[i])
         return logp
