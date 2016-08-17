@@ -20,11 +20,11 @@ _model_ls = ['-', '--', ':', '-.']
 
 
 def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
-            pulls=True, xfigsize=None, yfigsize=None, figtext=None, 
+            pulls=True, xfigsize=None, yfigsize=None, figtext=None,
             model_label=None, errors=None, ncol=2, figtextsize=1.,
             show_model_params=True, tighten_ylim=False, color=None,
-            cmap=None, cmap_lims=(3000., 10000.), fname=None,
-            ci=None, **kwargs):
+            cmap=None, cmap_lims=(3000., 10000.), fname=None, mag=False, 
+            fill_percentiles=None, **kwargs):
     """Plot light curve data or model light curves.
 
     Parameters
@@ -92,7 +92,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         color at the high end of the colormap.
     fname : str, optional
         Filename to pass to savefig. If None (default), figure is returned.
-    ci : (float, float, float), optional
+    fill_percentiles : (float, float, float), optional
         When multiple models are given, the percentiles for a light
         curve confidence interval. The upper and lower perceniles
         define a fill between region, and the middle percentile
@@ -315,6 +315,9 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             time = data['time'][mask]
             flux = data['flux'][mask]
             fluxerr = data['fluxerr'][mask]
+            if mag:
+                fluxerr = fluxerr / (np.log(10.) * 0.4 * flux)
+                flux = zpsys.band_flux_to_mag(flux, band)
             ax.errorbar(time - toff, flux, fluxerr, ls='None',
                         color=bandcolor, marker='.', markersize=3.)
 
@@ -323,11 +326,14 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         labels = []
         mflux_ranges = []
         mfluxes = []
-        plotci = len(models) > 1 and ci is not None
-        
+        plotci = len(models) > 1 and fill_percentiles is not None
+
         for i, model in enumerate(models):
             if model.bandoverlap(band):
-                mflux = model.bandflux(band, tgrid, zp=zp, zpsys=zpsys)
+                if mag:
+                    mflux = model.bandmag(band, tgrid, zpsys=zpsys)
+                else:
+                    mflux = model.bandflux(band, tgrid, zp=zp, zpsys=zpsys)
                 if not plotci:
                     mflux_ranges.append((mflux.min(), mflux.max()))
                     l, = ax.plot(tgrid - toff, mflux,
@@ -345,7 +351,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             labels.append(model_labels[i])
 
         if plotci:
-            lo, med, up = np.percentile(mfluxes, ci, axis=0)
+            lo, med, up = np.percentile(mfluxes, fill_percentiles, axis=0)
             l, = ax.plot(tgrid - toff, med, marker='None',
                          color=bandcolor)
             lines.append(l)
@@ -390,7 +396,10 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             divider = make_axes_locatable(ax)
             axpulls = divider.append_axes('bottom', size='30%', pad=0.15,
                                           sharex=ax)
-            mflux = models[0].bandflux(band, time, zp=zp, zpsys=zpsys)
+            if mag:
+                mflux = models[0].bandmag(band, time, zpsys=zpsys)
+            else:
+                mflux = models[0].bandflux(band, time, zp=zp, zpsys=zpsys)
             fluxpulls = (flux - mflux) / fluxerr
             axpulls.axhspan(ymin=-1., ymax=1., color='0.95')
             axpulls.axhline(y=0., color=bandcolor)
@@ -401,6 +410,10 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             ymin, ymax = axpulls.get_ylim()
             absymax = max(abs(ymin), abs(ymax))
             axpulls.set_ylim((-absymax, absymax))
+
+            if mag:
+                axpulls.invert_yaxis()
+                ax.invert_yaxis()
 
             # Set x limits to global values.
             axpulls.set_xlim((tmin-toff, tmax-toff))
