@@ -23,7 +23,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             pulls=True, xfigsize=None, yfigsize=None, figtext=None,
             model_label=None, errors=None, ncol=2, figtextsize=1.,
             show_model_params=True, tighten_ylim=False, color=None,
-            cmap=None, cmap_lims=(3000., 10000.), fname=None, mag=False, 
+            cmap=None, cmap_lims=(3000., 10000.), fname=None, mag=False,
             fill_percentiles=None, **kwargs):
     """Plot light curve data or model light curves.
 
@@ -190,7 +190,8 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
     # Standardize and normalize data.
     if data is not None:
         data = standardize_data(data)
-        data = normalize_data(data, zp=zp, zpsys=zpsys)
+        if not mag:
+            data = normalize_data(data, zp=zp, zpsys=zpsys)
 
     # Bands to plot
     if data is None:
@@ -317,7 +318,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             fluxerr = data['fluxerr'][mask]
             if mag:
                 fluxerr = fluxerr / (np.log(10.) * 0.4 * flux)
-                flux = zpsys.band_flux_to_mag(flux, band)
+                flux = get_magsystem(zpsys).band_flux_to_mag(flux, band)
             ax.errorbar(time - toff, flux, fluxerr, ls='None',
                         color=bandcolor, marker='.', markersize=3.)
 
@@ -370,7 +371,8 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         ax.text(bandname_coords[0], bandname_coords[1], band,
                 color='k', ha=bandname_ha, va='top', transform=ax.transAxes)
 
-        ax.axhline(y=0., ls='--', c='k')  # horizontal line at flux = 0.
+        if not mag:
+            ax.axhline(y=0., ls='--', c='k')  # horizontal line at flux = 0.
         ax.set_xlim((tmin-toff, tmax-toff))
 
         # If we plotted any models, narrow axes limits so that the model
@@ -410,10 +412,8 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             ymin, ymax = axpulls.get_ylim()
             absymax = max(abs(ymin), abs(ymax))
             axpulls.set_ylim((-absymax, absymax))
-
             if mag:
                 axpulls.invert_yaxis()
-                ax.invert_yaxis()
 
             # Set x limits to global values.
             axpulls.set_xlim((tmin-toff, tmax-toff))
@@ -447,6 +447,9 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         else:
             for l in bottomax.get_xticklabels():
                 l.set_visible(False)
+
+        if mag:
+            ax.invert_yaxis()
 
     if fname is None:
         return fig
