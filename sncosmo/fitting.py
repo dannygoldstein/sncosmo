@@ -39,7 +39,7 @@ def _chisq(data, model, modelcov, mag=False):
                       diff[:, np.newaxis])[0, 0]
     else:
         if mag:
-            mmag = model.bandmag(data['band'], data['time'], zpsys=data['zpsys'])
+            mmag = model.bandmag(data['band'], data['zpsys'], data['time'])
             return np.sum(((data['mag'] - mmag) / data['magerr'])**2)
         else:
             mflux = model.bandflux(data['band'], data['time'], zp=data['zp'],
@@ -316,8 +316,14 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
     """
 
     # Standardize and normalize data.
+    if mag:
+        m = data['mag']
+        me = data['magerr']
     data = standardize_data(data)
     data = normalize_data(data)
+    if mag:
+        data['mag'] = m
+        data['magerr'] = me
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
@@ -855,13 +861,13 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
 
     # Standardize and normalize data.
     if mag:
-        mag = data['mag']
-        magerr = data['magerr']
+        m = data['mag']
+        me = data['magerr']
     data = standardize_data(data)
     data = normalize_data(data)
     if mag:
-        data['mag'] = mag
-        data['magerr'] = magerr
+        data['mag'] = m
+        data['magerr'] = me
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
