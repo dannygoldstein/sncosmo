@@ -8,6 +8,7 @@ import os
 import sys
 import re
 import json
+import math
 
 import numpy as np
 from astropy.utils import OrderedDict as odict
@@ -16,6 +17,7 @@ from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.extern import six
+from numpy import float64
 
 from .photdata import dict_to_array
 from .spectral import get_magsystem
