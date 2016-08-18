@@ -386,8 +386,12 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             ax.set_ylim(ymin, ymax)
 
         if col == 0:
-            ax.set_ylabel('flux ($ZP_{{{0}}} = {1}$)'
-                          .format(get_magsystem(zpsys).name.upper(), zp))
+            if not mag:
+                ax.set_ylabel('flux ($ZP_{{{0}}} = {1}$)'
+                              .format(get_magsystem(zpsys).name.upper(), zp))
+            else:
+                ax.set_ylabel('$m_{{{0}}}$'
+                              .format(get_magsystem(zpsys).name.upper()))
 
         show_pulls = (pulls and
                       data is not None and
