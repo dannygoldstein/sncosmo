@@ -204,7 +204,7 @@ def guess_t0_and_amplitude(data, model, minsnr):
 def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
            guess_amplitude=True, guess_t0=True, guess_z=True,
            minsnr=5., modelcov=False, verbose=False, maxcall=10000,
-           **kwargs):
+           mag=False, **kwargs):
     """Fit model parameters to data by minimizing chi^2.
 
     Ths function defines a chi^2 to minimize, makes initial guesses for
@@ -388,7 +388,7 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
         # argument for each parameter.
         def fitchisq(*parameters):
             model.parameters = parameters
-            return _chisq(data, model, modelcov=modelcov)
+            return _chisq(data, model, modelcov=modelcov, mag=mag)
 
         # Set up keyword arguments to pass to Minuit initializer.
         kwargs = {}
