@@ -20,7 +20,7 @@ class DataQualityError(Exception):
     pass
 
 
-def _chisq(data, model, modelcov):
+def _chisq(data, model, modelcov, mag=False):
     """Like chisq but assumes data is already standardized.
 
     The purpose of having this as a separate function is for the benefit
@@ -38,9 +38,13 @@ def _chisq(data, model, modelcov):
         return np.dot(np.dot(diff[np.newaxis, :], invtotcov),
                       diff[:, np.newaxis])[0, 0]
     else:
-        mflux = model.bandflux(data['band'], data['time'],
-                               zp=data['zp'], zpsys=data['zpsys'])
-        return np.sum(((data['flux'] - mflux) / data['fluxerr'])**2)
+        if mag:
+            mmag = model.bandmag(data['band'], data['time'], zpsys=data['zpsys'])
+            return np.sum(((data['mag'] - mmag) / data['magerr'])**2)
+        else:
+            mflux = model.bandflux(data['band'], data['time'], zp=data['zp'],
+                                   zpsys=data['zpsys'])
+            return np.sum(((data['flux'] - mflux) / data['fluxerr'])**2)
 
 
 def chisq(data, model, modelcov=False):
@@ -750,7 +754,7 @@ def nest_lc(data, model, vparam_names, bounds, guess_amplitude_bound=False,
 def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
             guess_amplitude=True, guess_t0=True, guess_z=True,
             minsnr=5., modelcov=False, nwalkers=10, nburn=200,
-            nsamples=1000, ntemps=None, thin=1, a=2.0):
+            nsamples=1000, ntemps=None, thin=1, a=2.0, mag=False):
     """Run an MCMC chain to get model parameter samples.
 
     This is a convenience function around `emcee.EnsembleSampler` or
@@ -850,8 +854,14 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
         raise ImportError("mcmc_lc() requires the emcee package.")
 
     # Standardize and normalize data.
+    if mag:
+        mag = data['mag']
+        magerr = data['magerr']
     data = standardize_data(data)
     data = normalize_data(data)
+    if mag:
+        data['mag'] = mag
+        data['magerr'] = magerr
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
@@ -923,7 +933,7 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
                 return -np.inf
 
         model.parameters[modelidx] = parameters
-        logp = -0.5 * _chisq(data, model, modelcov=modelcov)
+        logp = -0.5 * _chisq(data, model, modelcov=modelcov, mag=mag)
         return logp
 
     def lnprior(parameters):
