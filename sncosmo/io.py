@@ -104,6 +104,67 @@ def read_griddata_ascii(name_or_obj):
     f.close()
     return np.array(x0), np.array(x1), np.array(y)
 
+def radec_to_xyz(ra, dec):
+    x = math.cos(np.deg2rad(ra)) * math.cos(np.deg2rad(ra))
+    y = math.cos(np.deg2rad(dec)) * math.sin(np.deg2rad(ra))
+    z = math.sin(np.deg2rad(dec))
+
+    return np.array([x, y, z], dtype=float64)
+
+
+def cmb_dz(ra, dec):
+    """See http://arxiv.org/pdf/astro-ph/9609034
+     CMBcoordsRA = 167.98750000 # J2000 Lineweaver
+     CMBcoordsDEC = -7.22000000
+    """
+
+    # J2000 coords from NED
+    CMB_DZ = 371000. / 299792458.
+    CMB_RA = 168.01190437
+    CMB_DEC = -6.98296811
+    CMB_XYZ = radec_to_xyz(CMB_RA, CMB_DEC)
+
+    coords_xyz = radec_to_xyz(ra, dec)
+    
+    dz = CMB_DZ * np.dot(CMB_XYZ, coords_xyz)
+
+    return dz
+
+
+def helio_to_cmb(z, ra, dec):
+    """Convert from heliocentric redshift to CMB-frame redshift.
+    
+    Parameters
+    ----------
+    z : float
+        Heliocentric redshift.
+    ra, dec: float
+        RA and Declination in degrees (J2000).
+    """
+
+    dz = -cmb_dz(ra, dec)
+    one_plus_z_pec = math.sqrt((1. + dz) / (1. - dz))
+    one_plus_z_CMB = (1. + z) / one_plus_z_pec
+
+    return one_plus_z_CMB - 1.
+
+
+def cmb_to_helio(z, ra, dec):
+    """Convert from CMB-frame redshift to heliocentric redshift.
+    
+    Parameters
+    ----------
+    z : float
+        CMB-frame redshift.
+    ra, dec: float
+        RA and Declination in degrees (J2000).
+    """
+
+    dz = -cmb_dz(ra, dec)
+    one_plus_z_pec = math.sqrt((1. + dz) / (1. - dz))
+    one_plus_z_helio = (1. + z) * one_plus_z_pec
+
+    return one_plus_z_helio - 1.
 
 def read_griddata_fits(name_or_obj, ext=0):
     """Read a multi-dimensional grid of data from a FITS file, where the
@@ -421,7 +482,7 @@ def _read_csp(f, **kwargs):
 
     meta        = odict()
     data        = []
-    colnames    = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'magsys']
+    colnames    = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'magsys', 'mag', 'magerr']
     readingdata = False
     magsys      = get_magsystem('csp')
 
@@ -452,6 +513,7 @@ def _read_csp(f, **kwargs):
 
                 meta['ra']  = coord.ra.value
                 meta['dec'] = coord.dec.value
+                meta['zhelio'] = cmb_to_helio(meta['zcmb'], meta['ra'], meta['dec'])
 
             if j == 0:
                 meta['name'] = line.split()[-1]
@@ -482,7 +544,7 @@ def _read_csp(f, **kwargs):
                     flux    = magsys.band_mag_to_flux(mag, filt)
                     fluxerr = magerr * flux / 1.086 
                     zp      = magsys.zeropoints[filt]
-                    data.append((mjd, filt, flux, fluxerr, zp, magsys.name))
+                    data.append((mjd, filt, flux, fluxerr, zp, magsys.name, mag, magerr))
 
     data = dict(zip(colnames, zip(*data)))
     return meta, data
