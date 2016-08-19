@@ -7,6 +7,8 @@ import math
 from collections import OrderedDict as odict
 
 import numpy as np
+from numpy.lib.recfunctions import append_fields
+
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline1d
 from astropy.extern import six
 
@@ -322,8 +324,7 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
     data = standardize_data(data)
     data = normalize_data(data)
     if mag:
-        data['mag'] = m
-        data['magerr'] = me
+        data = append_fields(data, ('mag', 'magerr'), (m, me))
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
@@ -866,8 +867,7 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
     data = standardize_data(data)
     data = normalize_data(data)
     if mag:
-        data['mag'] = m
-        data['magerr'] = me
+        data = append_fields(data, ('mag', 'magerr'), (m, me))        
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
