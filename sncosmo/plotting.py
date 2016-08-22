@@ -332,7 +332,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
         for i, model in enumerate(models):
             if model.bandoverlap(band):
                 if mag:
-                    mflux = model.bandmag(band, tgrid, zpsys=zpsys)
+                    mflux = model.bandmag(band, zpsys, tgrid)
                 else:
                     mflux = model.bandflux(band, tgrid, zp=zp, zpsys=zpsys)
                 if not plotci:
