@@ -403,7 +403,7 @@ def plot_lc(data=None, model=None, bands=None, zp=25., zpsys='ab',
             axpulls = divider.append_axes('bottom', size='30%', pad=0.15,
                                           sharex=ax)
             if mag:
-                mflux = models[0].bandmag(band, time, zpsys=zpsys)
+                mflux = models[0].bandmag(band, zpsys, time)
             else:
                 mflux = models[0].bandflux(band, time, zp=zp, zpsys=zpsys)
             fluxpulls = (flux - mflux) / fluxerr

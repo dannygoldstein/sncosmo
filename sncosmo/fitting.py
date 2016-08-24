@@ -160,6 +160,9 @@ def guess_t0_and_amplitude(data, model, minsnr):
 
     Assumes the data has been standardized."""
 
+    data = copy.copy(data)
+    data = normalize_data(data)
+
     timegrid = np.linspace(model.mintime(), model.maxtime(),
                            int(model.maxtime() - model.mintime() + 1))
 
@@ -322,9 +325,10 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
         m = data['mag']
         me = data['magerr']
     data = standardize_data(data)
-    data = normalize_data(data)
     if mag:
         data = append_fields(data, ('mag', 'magerr'), (m, me))
+    else:
+        data = normalize_data(data)
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
