@@ -161,12 +161,20 @@ def cmb_to_helio(z, ra, dec):
     ra, dec: float
         RA and Declination in degrees (J2000).
     """
+    
+    V_apex = 371.0 # km / s
+    l_apex = np.deg2rad(264.14)
+    b_apex = np.deg2rad(48.26)
+    c = 3e5 # km / s
+    V_cmb = c * z # km / s
 
-    dz = -cmb_dz(ra, dec)
-    one_plus_z_pec = math.sqrt((1. + dz) / (1. - dz))
-    one_plus_z_helio = (1. + z) * one_plus_z_pec
+    lbdeg = SkyCoord(ra, dec, frame='icrs', unit='deg').galactic
+    l, b = map(np.deg2rad, [lbdeg.l.value, lbdeg.b.value])
+    t1 = np.sin(b) * np.sin(b_apex)
+    t2 = np.cos(b) * np.cos(b_apex) * np.cos(l - l_apex)
+    dV = V_apex * (t1 + t2)
+    return (V_cmb - dV) / c
 
-    return one_plus_z_helio - 1.
 
 def read_griddata_fits(name_or_obj, ext=0):
     """Read a multi-dimensional grid of data from a FITS file, where the
@@ -507,12 +515,11 @@ def _read_csp(f, **kwargs):
             if j == 2:
                 sline = line[1:].split()
                 meta['zcmb'] = float(sline[2])
-                ra  = (sline[5].replace(':', '%s') + '%s') % ('d','m','s')
+                ra  = (sline[5].replace(':', '%s') + '%s') % ('h','m','s')
                 dec = (sline[8].replace(':', '%s') + '%s') % ('d','m','s')
 
                 # convert from dms to degrees
-                coord = SkyCoord(ra, dec)
-
+                coord = SkyCoord(ra, dec, unit=('hourangle', 'deg'))
                 meta['ra']  = coord.ra.value
                 meta['dec'] = coord.dec.value
                 meta['zhelio'] = cmb_to_helio(meta['zcmb'], meta['ra'], meta['dec'])
