@@ -869,9 +869,11 @@ def mcmc_lc(data, model, vparam_names, bounds=None, priors=None,
         m = data['mag']
         me = data['magerr']
     data = standardize_data(data)
-    data = normalize_data(data)
     if mag:
-        data = append_fields(data, ('mag', 'magerr'), (m, me))        
+        data = append_fields(data, ('mag', 'magerr'), (m, me))
+    else:
+        data = normalize_data(data)
+        
 
     # Make a copy of the model so we can modify it with impunity.
     model = copy.copy(model)
