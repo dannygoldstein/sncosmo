@@ -211,59 +211,97 @@ class _ModelBase(object):
     """
 
     @property
+    def models(self):
+        result = [self]
+        for model in self._models:
+            result += model.models
+        return np.unique(result).tolist()
+
+    @property
+    def param_map(self):
+        """Name of parameter in this model mapped to its owner model and its
+        "proper name" in that owner model."""
+        models = self.models
+
+        # we want parameters to have the simplest names possible
+        simple_names = []
+        values = []
+        for model in models:
+            simple_names.extend(model._param_names)
+            for name in model._param_names:
+                values.append((model, name))
+
+        # check for name collisions
+        final_names = []
+        change_dict = {}
+        for name in simple_names:
+            if name in final_names:
+                i = final_names.index(name)
+                if name in change_dict:
+                    change_dict[name] += 1
+                else:
+                    change_dict[name] = 0
+                final_names[i] = name + ('(%d)' % change_dict[name])
+            final_names.append(name)
+        for name, n in change_dict.items():
+            i = final_names.index(name)
+            final_names[i] = name + ('(%d)' % (n + 1))
+            
+        return odict(zip(final_names, values))
+
+    @property
     def param_names(self):
-        """List of parameter names."""
-        return self._param_names
+        return tuple(self.param_map.keys())
+
+    @property
+    def param_names_latex(self):
+        pmap = self.param_map
+        result = []
+        for key, (owner, propname) in pmap.items():
+            i = owner._param_names.index(key)
+            laname = owner._param_names_latex[i]
+            result.append(key.replace(propname, laname))
+        return result
 
     @property
     def parameters(self):
-        """Parameter value array"""
-        return self._parameters
-
-    @parameters.setter
-    def parameters(self, value):
-        value = np.asarray(value)
-        if value.shape != self._parameters.shape:
-            raise ValueError("Incorrect number of parameters.")
-        self._parameters[:] = value
+        result = []
+        for model in self.models:
+            result.extend(model._parameters)
+        return tuple(result)
 
     def set(self, **param_dict):
         """Set parameters of the model by name."""
+        pmap =  self.param_map
         for key, val in param_dict.items():
             try:
-                i = self._param_names.index(key)
-            except ValueError:
+                owner, propname = pmap[key]
+            except KeyError:
                 raise KeyError("Unknown parameter: " + repr(key))
-            self._parameters[i] = val
+            i = owner._param_names.index(propname)
+            owner._parameters[i] = val
 
     def get(self, name):
         """Get parameter of the model by name."""
         try:
-            i = self._param_names.index(name)
+            owner, propname = self.param_map[name]
         except ValueError:
             raise KeyError("Model has no parameter " + repr(name))
-        return self._parameters[i]
+        i = owner._param_names.index(propname)
+        return owner._parameters[i]
 
+    # revisit these
     def _headsummary(self):
         return ''
 
     def __str__(self):
         parameter_lines = [self._headsummary(), 'parameters:']
-        if len(self._param_names) > 0:
-            m = max(map(len, self._param_names))
+        if len(self.param_names) > 0:
+            m = max(map(len, self.param_names))
             extralines = ['  ' + k.ljust(m) + ' = ' + repr(v)
-                          for k, v in zip(self._param_names, self._parameters)]
+                          for k, v in zip(self.param_names, self.parameters)]
             parameter_lines.extend(extralines)
         return '\n'.join(parameter_lines)
-
-    def __copy__(self):
-        """Like a normal shallow copy, but makes an actual copy of the
-        parameter array."""
-        new_model = self.__new__(self.__class__)
-        for key, val in self.__dict__.items():
-            new_model.__dict__[key] = val
-        new_model._parameters = self._parameters.copy()
-        return new_model
 
 
 class Source(_ModelBase):
@@ -294,6 +332,7 @@ class Source(_ModelBase):
     """
 
     __metaclass__ = abc.ABCMeta
+    _models = []
 
     @abc.abstractmethod
     def __init__(self):
@@ -511,7 +550,7 @@ class TimeSeriesSource(Source):
     """
 
     _param_names = ['amplitude']
-    param_names_latex = ['A']
+    _param_names_latex = ['A']
 
     def __init__(self, phase, wave, flux, zero_before=False, name=None,
                  version=None):
@@ -522,6 +561,7 @@ class TimeSeriesSource(Source):
         self._parameters = np.array([1.])
         self._model_flux = Spline2d(phase, wave, flux, kx=3, ky=3)
         self._zero_before = zero_before
+        
 
     def _flux(self, phase, wave):
         f = self._parameters[0] * self._model_flux(phase, wave)
@@ -555,7 +595,7 @@ class StretchSource(Source):
     """
 
     _param_names = ['amplitude', 's']
-    param_names_latex = ['A', 's']
+    _param_names_latex = ['A', 's']
 
     def __init__(self, phase, wave, flux, name=None, version=None):
         self.name = name
@@ -633,7 +673,7 @@ class SALT2Source(Source):
     # v01file = 'salt2_spec_covariance_01.dat'           : 2dgrid
 
     _param_names = ['x0', 'x1', 'c']
-    param_names_latex = ['x_0', 'x_1', 'c']
+    _param_names_latex = ['x_0', 'x_1', 'c']
     _SCALE_FACTOR = 1e-12
 
     def __init__(self, modeldir=None,
@@ -1016,7 +1056,7 @@ class MLCS2k2Source(Source):
     """
 
     _param_names = ['amplitude', 'delta']
-    param_names_latex = ['A', '\Delta']
+    _param_names_latex = ['A', '\Delta']
 
     def __init__(self, fluxfile, name=None, version=None):
 
@@ -1090,14 +1130,14 @@ class Model(_ModelBase):
     def __init__(self, source, effects=None,
                  effect_names=None, effect_frames=None):
         self._param_names = ['z', 't0']
-        self.param_names_latex = ['z', 't_0']
+        self._param_names_latex = ['z', 't_0']
         self._parameters = np.array([0., 0.])
         self._source = get_source(source, copy=True)
         self.description = None
         self._effects = []
         self._effect_names = []
         self._effect_frames = []
-        self._synchronize_parameters()
+        self._models = [self.source]
 
         # Add PropagationEffects
         if (effects is not None or effect_names is not None or
@@ -1132,10 +1172,10 @@ class Model(_ModelBase):
             raise TypeError('effect is not a PropagationEffect')
         if frame not in ['rest', 'obs']:
             raise ValueError("frame must be one of: {'rest', 'obs'}")
-        self._effects.append(cp(effect))
+        self._effects.append(effect)
         self._effect_names.append(name)
         self._effect_frames.append(frame)
-        self._synchronize_parameters()
+        self._models.append(effect)
 
     @property
     def source(self):
@@ -1143,61 +1183,29 @@ class Model(_ModelBase):
         return self._source
 
     @property
-    def effect_names(self):
-        """Names of propagation effects (list of str)."""
-        return self._effect_names
-
-    @property
     def effects(self):
         """List of constituent propagation effects."""
-        return self._effects
+        result = []
+        result += self._effects
+        for model in self._models:
+            try:
+                result += model.effects
+            except AttributeError:
+                result += []
+        return np.unique(result).tolist()
 
-    def _synchronize_parameters(self):
-        """Synchronize parameter names and parameter arrays between
-        the aggregated parameters and those of the individual source and
-        effects.
-        """
-
-        # Build a new list of parameter names
-        self._param_names = self._param_names[0:2]
-        self._param_names.extend(self._source.param_names)
-        for effect, effect_name in zip(self._effects, self._effect_names):
-            self._param_names.extend([effect_name + param_name
-                                      for param_name in effect.param_names])
-
-        # Build a new list of latex parameter names
-        self.param_names_latex = self.param_names_latex[0:2]
-        self.param_names_latex.extend(self._source.param_names_latex)
-        for effect, effect_name in zip(self._effects, self._effect_names):
-            for name in effect.param_names_latex:
-                self.param_names_latex.append('{\\rm ' + effect_name + '}\,' +
-                                              name)
-
-        # For each "model", get its parameter array.
-        param_arrays = [self._parameters[0:2]]
-        models = [self._source] + self._effects
-        param_arrays.extend([m._parameters for m in models])
-
-        # Create a new parameter array built from the individual arrays
-        # and reference the individual parameter arrays to the new combined
-        # array.
-        self._parameters = np.concatenate(param_arrays)
-        pos = 2
-        for m in models:
-            l = len(m._parameters)
-            m._parameters = self._parameters[pos:pos+l]
-            pos += l
-
-        # Make a name for myself. We have to watch out for None values here.
-        # If all constituents are None, name is None. Otherwise, replace
-        # None's with '?'
-        names = [self._source.name] + self._effect_names
-        if all([name is None for name in names]):
-            self.description = None
-        else:
-            names = ['?' if name is None else name for name in names]
-            self.description = '+'.join(names)
-
+    @property
+    def effect_names(self):
+        """Names of propagation effects (list of str)."""        
+        result = []
+        result += self._effect_names
+        for model in self._models:
+            try:
+                result += model.effect_names
+            except AttributeError:
+                result += []
+        return np.unique(result).tolist()
+    
     def mintime(self):
         """Minimum observer-frame time at which the model is defined."""
         return (self._parameters[1] +
@@ -1232,18 +1240,7 @@ class Model(_ModelBase):
                 min_maxwave = effect_maxwave
         return min_maxwave
 
-    def _baseflux(self, time, wave):
-        """Array flux function."""
-        a = 1. / (1. + self._parameters[0])
-        phase = (time - self._parameters[1]) * a
-        restwave = wave * a
-
-        # Note that below we multiply by the scale factor to conserve
-        # bolometric luminosity.
-        f = a * self._source._flux(phase, restwave)
-
-        return f
-
+    
     def _flux(self, time, wave):
         """Array flux function."""
 
@@ -1642,7 +1639,8 @@ class PropagationEffect(_ModelBase):
     """
 
     __metaclass__ = abc.ABCMeta
-
+    _models = []
+    
     def minwave(self):
         return self._minwave
 
@@ -1664,7 +1662,7 @@ class PropagationEffect(_ModelBase):
 class CCM89Dust(PropagationEffect):
     """Cardelli, Clayton, Mathis (1989) extinction model dust."""
     _param_names = ['ebv', 'r_v']
-    param_names_latex = ['E(B-V)', 'R_V']
+    _param_names_latex = ['E(B-V)', 'R_V']
     _minwave = 1000.
     _maxwave = 33333.33
 
@@ -1680,7 +1678,7 @@ class CCM89Dust(PropagationEffect):
 class OD94Dust(PropagationEffect):
     """O'Donnell (1994) extinction model dust."""
     _param_names = ['ebv', 'r_v']
-    param_names_latex = ['E(B-V)', 'R_V']
+    _param_names_latex = ['E(B-V)', 'R_V']
     _minwave = 909.09
     _maxwave = 33333.33
 
@@ -1701,7 +1699,7 @@ class F99Dust(PropagationEffect):
 
     def __init__(self, r_v=3.1):
         self._param_names = ['ebv']
-        self.param_names_latex = ['E(B-V)']
+        self._param_names_latex = ['E(B-V)']
         self._parameters = np.array([0.])
         self._r_v = r_v
         self._f = extinction.Fitzpatrick99(r_v=r_v)
