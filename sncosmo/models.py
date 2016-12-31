@@ -285,7 +285,7 @@ class _ModelBase(object):
         """Get parameter of the model by name."""
         try:
             owner, propname = self.param_map[name]
-        except ValueError:
+        except KeyError:
             raise KeyError("Model has no parameter " + repr(name))
         i = owner._param_names.index(propname)
         return owner._parameters[i]
