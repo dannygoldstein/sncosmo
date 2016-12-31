@@ -372,7 +372,7 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
         # The iminuit minimizer expects the function signature to have an
         # argument for each parameter.
         def fitchisq(*parameters):
-            model.parameters = parameters
+            model.set(**dict(zip(vparam_names, parameters)))
             return chisq(data, model, modelcov=modelcov)
 
         # Set up keyword arguments to pass to Minuit initializer.
@@ -439,7 +439,7 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
 
         # numpy array of best-fit values (including fixed parameters).
         parameters = np.array([m.values[name] for name in model.param_names])
-        model.parameters = parameters  # set model parameters to best fit.
+        model.set(**dict(zip(vparam_names, parameters)))  # set model parameters to best fit.
 
         # Covariance matrix (only varied parameters) as numpy array.
         if m.covariance is None:
