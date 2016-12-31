@@ -352,7 +352,10 @@ def fit_lc(data, model, vparam_names, bounds=None, method='minuit',
     if (guess_amplitude or guess_t0):
         t0, amplitude = guess_t0_and_amplitude(data, model, minsnr)
         if guess_amplitude:
-            model.parameters[2] = amplitude
+            try:
+                model.set(amplitude=amplitude)
+            except KeyError:
+                model.set(x0=amplitude)
         if guess_t0:
             model.set(t0=t0)
 
