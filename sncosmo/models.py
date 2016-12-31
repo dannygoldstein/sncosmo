@@ -258,7 +258,7 @@ class _ModelBase(object):
         pmap = self.param_map
         result = []
         for key, (owner, propname) in pmap.items():
-            i = owner._param_names.index(key)
+            i = owner._param_names.index(propname)
             laname = owner._param_names_latex[i]
             result.append(key.replace(propname, laname))
         return result
@@ -1326,13 +1326,13 @@ class Model(_ModelBase):
         """
         band = np.asarray(band)
         if z is None:
-            z = self._parameters[0]
+            z = self.get('z')
         z = np.asarray(z)
         ndim = (band.ndim, z.ndim)
         band = band.ravel()
         z = z.ravel()
         overlap = np.empty((len(band), len(z)), dtype=np.bool)
-        shift = (1. + z)/(1+self._parameters[0])
+        shift = (1. + z)/(1+self.get('z'))
         for i, b in enumerate(band):
             b = get_bandpass(b)
             overlap[i, :] = ((b.wave[0] > self.minwave()*shift) &
