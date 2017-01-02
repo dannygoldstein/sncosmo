@@ -303,6 +303,15 @@ class _ModelBase(object):
             parameter_lines.extend(extralines)
         return '\n'.join(parameter_lines)
 
+    def __copy__(self):
+        """Like a normal shallow copy, but makes an actual copy of the
+        parameter array."""
+        new_model = self.__new__(self.__class__)
+        for key, val in self.__dict__.items():
+            new_model.__dict__[key] = val
+        new_model._parameters = self._parameters.copy()
+        return new_model
+
 
 class Source(_ModelBase):
     """An abstract base class for transient models.
@@ -1172,10 +1181,11 @@ class Model(_ModelBase):
             raise TypeError('effect is not a PropagationEffect')
         if frame not in ['rest', 'obs']:
             raise ValueError("frame must be one of: {'rest', 'obs'}")
-        self._effects.append(effect)
+        add = cp(effect)
+        self._effects.append(add)
         self._effect_names.append(name)
         self._effect_frames.append(frame)
-        self._models.append(effect)
+        self._models.append(add)
 
     @property
     def source(self):
